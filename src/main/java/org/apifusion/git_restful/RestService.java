@@ -45,10 +45,10 @@ RestService
         return repo;
     }
 
-       @RequestMapping("/branches")
+       @RequestMapping("/list/{repo}/branches")
             public
         String[]
-    branches( @RequestParam(value="repo") String repoName ) throws IOException, InterruptedException
+    branches( @PathVariable(value="repo") String repoName ) throws IOException, InterruptedException
     {
         String[] r = exec( "git branch -r", repoName);
         for( int i =0 ;i<r.length; i++ )
@@ -68,7 +68,22 @@ RestService
        @RequestMapping("/list")
             public
         FolderEntry[]
-    list( @RequestParam(value="repo") String repo, @RequestParam(value="folder") String folder ) throws IOException, InterruptedException
+    listRepos() throws IOException, InterruptedException
+    {
+        return Files.list( TempPath ).map( FolderEntry::new ).toArray( FolderEntry[]::new );
+    }
+
+       @RequestMapping("/list/{repo}")
+            public
+        FolderEntry[]
+    listRepoRoot( @PathVariable(value="repo") String repo ) throws IOException, InterruptedException
+    {
+       return list( repo, "." );
+    }
+       @RequestMapping("/list/{repo}/{folder}")
+            public
+        FolderEntry[]
+    list( @PathVariable(value="repo") String repo, @PathVariable(value="folder") String folder ) throws IOException, InterruptedException
     {
         Path root = TempPath.resolve( repo );
         Path repoPath = root.resolve( "."+File.separator+folder );
@@ -114,6 +129,7 @@ RestService
 
         p.waitFor();
         System.out.println( cmdFile + " done" );
+        cmdFile.delete();
         return ret.toArray( STRING_ARRAY );
     }
 }
