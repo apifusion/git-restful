@@ -1,4 +1,4 @@
-package hello;
+package org.apifusion.git_restful;
 
 import java.util.List;
 

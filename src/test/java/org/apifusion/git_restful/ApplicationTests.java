@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-package hello;
+package org.apifusion.git_restful;
 
+import org.apifusion.git_restful.PersonRepository;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
