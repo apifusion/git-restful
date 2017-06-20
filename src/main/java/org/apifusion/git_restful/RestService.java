@@ -25,7 +25,8 @@ RestService
         private static final String[]
     STRING_ARRAY = new String[]{};
 
-       @RequestMapping("/lock-repo")
+        @CrossOrigin
+        @RequestMapping("/lock-repo")
             public
         String
     lockRepo( @RequestParam(value="url") String url ) throws IOException, InterruptedException
@@ -44,19 +45,20 @@ RestService
         exec( "git clone " + url, ".");
         return repo;
     }
-
-       @RequestMapping("/list/{repo}/branches")
+        @CrossOrigin
+        @RequestMapping("/list/{repo}/branches")
             public
         String[]
     branches( @PathVariable(value="repo") String repoName ) throws IOException, InterruptedException
     {
-        String[] r = exec( "git branch -r", repoName);
+        String[] r = exec( "git branch -r", repoName );
         for( int i =0 ;i<r.length; i++ )
             r[i] = r[i].substring( r[i].lastIndexOf("origin/")+7 );
         // todo include releases
         return r;
     }
-       @RequestMapping("/lock-branch")
+        @CrossOrigin
+        @RequestMapping("/lock-branch")
             public
         String[]
     lockBranch( @RequestParam(value="repo") String repoName, @RequestParam(value="branch") String branch  ) throws IOException, InterruptedException
@@ -65,7 +67,8 @@ RestService
 
         return r;
     }
-       @RequestMapping("/list")
+        @CrossOrigin
+        @RequestMapping("/list")
             public
         FolderEntry[]
     listRepos() throws IOException, InterruptedException
@@ -73,14 +76,16 @@ RestService
         return Files.list( TempPath ).map( FolderEntry::new ).toArray( FolderEntry[]::new );
     }
 
-       @RequestMapping("/list/{repo}")
+        @CrossOrigin
+        @RequestMapping("/list/{repo}")
             public
         FolderEntry[]
     listRepoRoot( @PathVariable(value="repo") String repo ) throws IOException, InterruptedException
     {
        return list( repo, "." );
     }
-       @RequestMapping("/list/{repo}/{folder}")
+        @CrossOrigin
+        @RequestMapping("/list/{repo}/{folder}")
             public
         FolderEntry[]
     list( @PathVariable(value="repo") String repo, @PathVariable(value="folder") String folder ) throws IOException, InterruptedException
