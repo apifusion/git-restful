@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Properties;
 
 /**
  * Restful API controller
@@ -25,6 +26,18 @@ RestService
         private static final String[]
     STRING_ARRAY = new String[]{};
 
+        @CrossOrigin
+        @RequestMapping("/git-restful")
+            public
+        Properties
+    version() throws IOException, InterruptedException
+    {
+        java.io.InputStream is = getClass().getClassLoader().getResourceAsStream("app.properties");
+        java.util.Properties p = new Properties();
+        p.load(is);
+        is.close();
+        return p;
+    }
         @CrossOrigin
         @RequestMapping("/lock-repo")
             public
