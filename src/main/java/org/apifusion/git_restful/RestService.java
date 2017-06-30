@@ -71,10 +71,10 @@ RestService
         return r;
     }
         @CrossOrigin
-        @RequestMapping("/lock-branch")
+        @RequestMapping("/lock-branch/{repo}/{branch}")
             public
         String[]
-    lockBranch( @RequestParam(value="repo") String repoName, @RequestParam(value="branch") String branch  ) throws IOException, InterruptedException
+    lockBranch( @PathVariable(value="repo") String repoName, @PathVariable(value="branch") String branch  ) throws IOException, InterruptedException
     {
         String[] r = exec( "git checkout " + branch, repoName );
 
