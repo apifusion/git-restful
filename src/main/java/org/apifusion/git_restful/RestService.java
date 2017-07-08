@@ -80,29 +80,25 @@ RestService
 
         return r;
     }
+//        @CrossOrigin
+//        @RequestMapping("/list")
+//            public
+//        FolderEntry[]
+//    listRepos() throws IOException, InterruptedException
+//    {
+//        return Files.list( TempPath ).map( FolderEntry::new ).toArray( FolderEntry[]::new );
+//    }
+
         @CrossOrigin
         @RequestMapping("/list")
             public
         FolderEntry[]
-    listRepos() throws IOException, InterruptedException
+    list( @RequestParam(value="repo"  ,required = false,defaultValue = "") String repo
+        , @RequestParam(value="folder",required = false,defaultValue = "") String folder ) throws IOException, InterruptedException
     {
-        return Files.list( TempPath ).map( FolderEntry::new ).toArray( FolderEntry[]::new );
-    }
+        if( 0==repo.length() )
+            return Files.list( TempPath ).map( FolderEntry::new ).toArray( FolderEntry[]::new );
 
-        @CrossOrigin
-        @RequestMapping("/list/{repo}")
-            public
-        FolderEntry[]
-    listRepoRoot( @PathVariable(value="repo") String repo ) throws IOException, InterruptedException
-    {
-       return list( repo, "." );
-    }
-        @CrossOrigin
-        @RequestMapping("/list/{repo}/{folder}")
-            public
-        FolderEntry[]
-    list( @PathVariable(value="repo") String repo, @PathVariable(value="folder") String folder ) throws IOException, InterruptedException
-    {
         Path root = TempPath.resolve( repo );
         Path repoPath = root.resolve( "."+File.separator+folder );
         if( repoPath.toFile().getCanonicalPath().startsWith( root.toFile().getCanonicalPath() ) )
