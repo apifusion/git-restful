@@ -1,4 +1,5 @@
 package org.apifusion.git_restful;
+// http://localhost/af/ApiFusion.org-folders/ui/tools/importGit.html
 
 import org.springframework.web.bind.annotation.*;
 
@@ -10,9 +11,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Properties;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Restful API controller
@@ -25,6 +27,14 @@ RestService
     TempPath = FileSystems.getDefault().getPath( System.getProperty("java.io.tmpdir"), "git-restful" );
         private static final String[]
     STRING_ARRAY = new String[]{};
+
+        private static final Map<String, String>
+    ext2suffix = new HashMap<>();
+                static  {
+                            ext2suffix.put("java"   ,"javadoc"  );
+                            ext2suffix.put("js"     ,"jsdoc"    );
+                            ext2suffix.put("py"     ,"sphynx"    );
+                        }
 
         @CrossOrigin
         @RequestMapping("/git-restful")
@@ -76,8 +86,10 @@ RestService
         String[]
     lockBranch( @PathVariable(value="repo") String repoName, @PathVariable(value="branch") String branch  ) throws IOException, InterruptedException
     {
-        String[] r = exec( "git checkout " + branch, repoName );
-
+        String[] r0 = exec( "git pull origin " + branch, repoName );
+        String[] r1 = exec( "git checkout " + branch, repoName );
+        String[] r = Stream.of(r0, r1).flatMap(Stream::of).toArray(String[]::new);
+        // ["Your branch is behind 'origin/master' by 8 commits, and can be fast-forwarded.","  (use \"git pull\" to update your local branch)"]
         return r;
     }
 //        @CrossOrigin
@@ -105,6 +117,88 @@ RestService
             return Files.list( repoPath ).filter( n -> !n.toFile().getName().equals(".git") ).map( FolderEntry::new ).toArray( FolderEntry[]::new );
         throw new IOException( "malicious folder " + folder );
     }
+
+        @CrossOrigin
+        @RequestMapping("/docs") // http://localhost:8080/docs?repo=ApiFusion.org-folders&folder=
+            public
+        FolderEntry[]
+    docs( @RequestParam(value="repo"  ,required = false ) String repo
+        , @RequestParam(value="folder",required = false,defaultValue = "") String folder ) throws IOException, InterruptedException
+    {
+        /*
+        *   1. Check whether docs exist
+        *   1a. if exist check whether docs created after pulling the branch
+        *       2a. if yes, include in return list
+        *       2b. otherwise remove docs
+        *   3. if docs not in result list
+        *   4a. generate docs
+        *   4b. add generated into result list
+        * */
+
+        Path root = TempPath.resolve( repo );
+        long repoTime = root.toFile().lastModified();
+        Path repoPath = root.resolve( "."+File.separator+folder );
+        File repoPathFile = repoPath.toFile();
+        String folderName = repoPathFile.getName();
+
+        log( repoPath.toFile().getAbsolutePath() );
+        if( !repoPath.toFile().getCanonicalPath().startsWith( root.toFile().getCanonicalPath() ) )
+            throw new IOException( "malicious folder " + folder );
+        Map<String, File> docRoots = Files.list( TempPath )
+                    .map( f-> f.toFile() )
+                    .filter( f ->
+                    {   if( !f.getName().startsWith( repo+".") )
+                            return false;
+                        if( f.lastModified() >= repoTime )
+                            return true;
+
+                        deleteFolder( f.toPath(), "outdated" ); // 2b
+                        return false;
+                    })
+                    .collect( Collectors.toMap( RestService::getExtension, Function.identity()) );
+
+        FolderEntry[] ret = Files.list(repoPath).map( i -> i.toFile().getName() )
+                            .map( RestService::getExtension ) // extension
+                            .distinct()
+                .map( ext->
+                {   File d = docRoots.get( ext );
+                    if( null != d )
+                    {   Path p = d.toPath().resolve( folder );
+                        return p;
+                    }
+                    // todo run doc script
+                    return null;
+                })
+                .filter( p -> p != null )
+                .map( FolderEntry::new ).toArray( FolderEntry[]::new );
+
+        return ret;
+//        return Files.list( TempPath ).filter( n -> n.toFile().getName().startsWith( repo+".") )
+//                .map( FolderEntry::new ).toArray( FolderEntry[]::new );
+    }
+
+        private static String
+    getExtension( File f ){    return getExtension( f.getName() );    }
+
+        private static String
+    getExtension( String n ){    return n.substring(n.lastIndexOf('.')+1);    }
+
+        private void
+    deleteFolder( Path rootPath, String reason )
+    {   log( "removing "+reason, rootPath.toString() );
+        try
+        {   Files.walk(rootPath)
+                .sorted(Comparator.reverseOrder())
+                .map(Path::toFile)
+//                .peek(System.out::println)
+                .forEach(File::delete);
+        }catch( IOException e )
+            {   e.printStackTrace(); }
+    }
+        private void
+    log( String s ){ System.out.println(s); }
+        private void
+    log( String s1, String s2 ){ System.out.print(s1); System.out.print(' '); System.out.println(s2); }
             private
         String[]
     exec( String cmd, String repo ) throws IOException, InterruptedException
