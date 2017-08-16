@@ -24,7 +24,7 @@ import java.util.stream.Stream;
 RestService
 {
         private static final Path
-    TempPath = FileSystems.getDefault().getPath( System.getProperty("java.io.tmpdir"), "git-restful" );
+    TempPath = Application.TempPath;
         private static final String[]
     STRING_ARRAY = new String[]{};
 
