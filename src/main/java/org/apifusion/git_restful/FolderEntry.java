@@ -16,6 +16,7 @@ FolderEntry
 		          isFile = f.isFile();
 		     isDirectory = f.isDirectory();
 		          isLink = Files.isSymbolicLink(p);
+		            href = "/pages/"+p.toString().substring(  Application.TempPath.toString().length()+1 ).replaceAll("\\\\","/");
         try{  linkTarget = isLink ? Files.readSymbolicLink(p).toString() : "";  }
         catch( IOException e ){  e.printStackTrace(); }
     }
@@ -24,5 +25,6 @@ FolderEntry
 	public boolean 	isDirectory;
 	public boolean 	isFile;
 	public boolean 	isLink;
-	public String   linkTarget;
+	public String   	linkTarget;
+	public String	href;
 }

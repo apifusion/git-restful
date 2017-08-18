@@ -205,7 +205,13 @@ RestService
         }
         // todo all {docsFolders}/{folder}/{noExt}.*
         return Files.list( TempPath ).filter( n -> n.toFile().getName().startsWith( repoName+".") )
-                .map( FolderEntry::new ).toArray( FolderEntry[]::new );
+                .map( docRootPath ->
+                {   // get html for repoPathFile.getName()
+                    String docPath = folder.substring(  0, folder.length()-getExtension( repoPathFile ).length() )+"html" ;
+                    Path dp = docRootPath.resolve( docPath );
+                    return new FolderEntry( dp );
+                })
+                .toArray( FolderEntry[]::new );
     }
 
         private static String
