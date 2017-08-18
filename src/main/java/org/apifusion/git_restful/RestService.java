@@ -104,11 +104,11 @@ RestService
 //        return Files.list( TempPath ).map( FolderEntry::new ).toArray( FolderEntry[]::new );
 //    }
 
-    private static final String PROJECTS = "/projects/";
-    private static final String PAGES = "/pages/";
+    protected static final String PROJECTS = "/projects/";
+    protected static final String PAGES = "/pages/";
 
         @CrossOrigin
-        @RequestMapping( PROJECTS + "**")
+        @RequestMapping( PROJECTS + "**" )
             public
         FolderEntry[]
     folderList(  HttpServletRequest request,  HttpServletResponse response )
@@ -117,7 +117,6 @@ RestService
         String p = folder.substring( PROJECTS.length() );
         Path pp = TempPath.resolve( p );
         File f = pp.toFile();
-        System.out.println( folder );
         if( f.isFile() )
         {
             request.getRequestDispatcher(  PAGES + p  ).forward( request, response );

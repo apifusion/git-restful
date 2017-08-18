@@ -10,28 +10,28 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
 
-@SpringBootApplication
-public class Application {
-
+    @SpringBootApplication
+    public class
+Application
+{
         protected static final Path
     TempPath = FileSystems.getDefault().getPath( System.getProperty("java.io.tmpdir"), "git-restful" );
 
 		@Bean
 		WebMvcConfigurer
-	configurer ()
-	{
+	configurer () // enable Tomcat serving files from projects folder under  /pages
+	{             // not called directly, rather server side redirected from /projects for a file
         return new WebMvcConfigurerAdapter()
 		{
             @Override
             public void addResourceHandlers (ResourceHandlerRegistry registry)
 			{	String pagesPath = TempPath.toFile().getPath().replaceAll("\\\\","/");
-				System.out.println( "http://localhost:8080/pages "+pagesPath );
-				registry.addResourceHandler("/pages/**").
-                          addResourceLocations("file:/"+pagesPath+'/' );
+				System.out.println( "http://localhost:8080"+RestService.PAGES+" served from "+pagesPath );
+				registry.addResourceHandler( RestService.PAGES+"**")
+						.addResourceLocations("file:/"+pagesPath+'/' );
             }
         };
     }
-	public static void main(String[] args) {
-		SpringApplication.run(Application.class, args);
-	}
+	public static void main(String[] args)
+        {	SpringApplication.run(Application.class, args);	}
 }
