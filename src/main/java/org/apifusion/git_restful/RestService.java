@@ -2,13 +2,16 @@ package org.apifusion.git_restful;
 // http://localhost/af/ApiFusion.org-folders/ui/tools/importGit.html
 
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.HandlerMapping;
 
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -100,6 +103,28 @@ RestService
 //    {
 //        return Files.list( TempPath ).map( FolderEntry::new ).toArray( FolderEntry[]::new );
 //    }
+
+    private static final String PROJECTS = "/projects/";
+    private static final String PAGES = "/pages/";
+
+        @CrossOrigin
+        @RequestMapping( PROJECTS + "**")
+            public
+        FolderEntry[]
+    folderList(  HttpServletRequest request,  HttpServletResponse response )
+        throws IOException, InterruptedException, ServletException
+    {   String folder =(String) request.getAttribute( HandlerMapping.PATH_WITHIN_HANDLER_MAPPING_ATTRIBUTE );
+        String p = folder.substring( PROJECTS.length() );
+        Path pp = TempPath.resolve( p );
+        File f = pp.toFile();
+        System.out.println( folder );
+        if( f.isFile() )
+        {
+            request.getRequestDispatcher(  PAGES + p  ).forward( request, response );
+            return null;
+        }
+        return Files.list( pp ).map( FolderEntry::new ).toArray( FolderEntry[]::new );
+    }
 
         @CrossOrigin
         @RequestMapping("/list")
