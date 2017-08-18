@@ -106,6 +106,7 @@ RestService
 
     protected static final String PROJECTS = "/projects/";
     protected static final String PAGES = "/pages/";
+    protected static final String DOCS = "/docs/";
 
         @CrossOrigin
         @RequestMapping( PROJECTS + "**" )
@@ -143,11 +144,10 @@ RestService
     }
 
         @CrossOrigin
-        @RequestMapping("/docs") // http://localhost:8080/docs?repo=ApiFusion.org-folders&folder=
+        @RequestMapping( DOCS + "{repo}/**" ) // http://localhost:8080/docs?repo=ApiFusion.org-folders&folder=
             public
         FolderEntry[]
-    docs( @RequestParam(value="repo"  ,required = false ) String repo
-        , @RequestParam(value="folder",required = false,defaultValue = "") String folder ) throws IOException, InterruptedException
+    docs( @PathVariable(value="repo") String repoName, HttpServletRequest request ) throws IOException, InterruptedException
     {
         /*
         *   1. Check whether docs exist
@@ -159,19 +159,23 @@ RestService
         *   4b. add generated into result list
         * */
 
-        Path root = TempPath.resolve( repo );
+        String urlPath =(String) request.getAttribute( HandlerMapping.PATH_WITHIN_HANDLER_MAPPING_ATTRIBUTE );
+        String srcPath = urlPath.substring( DOCS.length() );
+        String folder  = srcPath.substring( repoName.length()+1 );
+
+        Path root = TempPath.resolve( repoName );
         long repoTime = root.toFile().lastModified();
-        Path repoPath = root.resolve( "."+File.separator+folder );
+        Path repoPath = TempPath.resolve( srcPath );
         File repoPathFile = repoPath.toFile();
         String folderName = repoPathFile.getName();
 
-        log( repoPath.toFile().getAbsolutePath() );
-        if( !repoPath.toFile().getCanonicalPath().startsWith( root.toFile().getCanonicalPath() ) )
-            throw new IOException( "malicious folder " + folder );
+        log( repoPathFile.getAbsolutePath() );
+        if( !repoPathFile.getCanonicalPath().startsWith( root.toFile().getCanonicalPath() ) )
+            throw new IOException( "malicious folder " + srcPath );
         Map<String, File> docRoots = Files.list( TempPath )
-                    .map( f-> f.toFile() )
+                    .map( Path::toFile )
                     .filter( f ->
-                    {   if( !f.getName().startsWith( repo+".") )
+                    {   if( !f.getName().startsWith( repoName+".") )
                             return false;
                         if( f.lastModified() >= repoTime )
                             return true;
@@ -180,25 +184,28 @@ RestService
                         return false;
                     })
                     .collect( Collectors.toMap( RestService::getExtension, Function.identity()) );
+        if( repoPathFile.isDirectory() )
+        {   // todo return all {docsFolders}/{folder}[/index.html]
+            FolderEntry[] ret = Files.list(repoPath).map( i -> i.toFile().getName() )
+                                .map( RestService::getExtension ) // extension
+                                .distinct()
+                    .map( ext->
+                    {   File d = docRoots.get( ext );
+                        if( null != d )
+                        {   Path pp = d.toPath().resolve( folder );
+                            return pp;
+                        }
+                        // todo run doc script
+                        return null;
+                    })
+                    .filter( x -> x != null )
+                    .map( FolderEntry::new ).toArray( FolderEntry[]::new );
 
-        FolderEntry[] ret = Files.list(repoPath).map( i -> i.toFile().getName() )
-                            .map( RestService::getExtension ) // extension
-                            .distinct()
-                .map( ext->
-                {   File d = docRoots.get( ext );
-                    if( null != d )
-                    {   Path p = d.toPath().resolve( folder );
-                        return p;
-                    }
-                    // todo run doc script
-                    return null;
-                })
-                .filter( p -> p != null )
+            return ret;
+        }
+        // todo all {docsFolders}/{folder}/{noExt}.*
+        return Files.list( TempPath ).filter( n -> n.toFile().getName().startsWith( repoName+".") )
                 .map( FolderEntry::new ).toArray( FolderEntry[]::new );
-
-        return ret;
-//        return Files.list( TempPath ).filter( n -> n.toFile().getName().startsWith( repo+".") )
-//                .map( FolderEntry::new ).toArray( FolderEntry[]::new );
     }
 
         private static String
