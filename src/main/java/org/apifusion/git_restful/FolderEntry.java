@@ -9,6 +9,7 @@ import java.nio.file.Path;
     public class
 FolderEntry
 {
+    private static int tmpPathLen = Application.TempPath.toString().length()+1;
 	public FolderEntry( Path p )
 	{	File f = p.toFile();
 		            name = f.getName();
@@ -16,7 +17,7 @@ FolderEntry
 		          isFile = f.isFile();
 		     isDirectory = f.isDirectory();
 		          isLink = Files.isSymbolicLink(p);
-		            href = "/pages/"+p.toString().substring(  Application.TempPath.toString().length()+1 ).replaceAll("\\\\","/");
+		            href = "/pages/"+p.toString().substring( tmpPathLen ).replaceAll("\\\\","/");
         try{  linkTarget = isLink ? Files.readSymbolicLink(p).toString() : "";  }
         catch( IOException e ){  e.printStackTrace(); }
     }

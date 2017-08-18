@@ -30,6 +30,8 @@ RestService
     TempPath = Application.TempPath;
         private static final String[]
     STRING_ARRAY = new String[]{};
+        private static final String[]
+    INDEX_FILES = new String[]{"index.html","package-summary.html"};
 
         private static final Map<String, String>
     ext2suffix = new HashMap<>();
@@ -185,35 +187,28 @@ RestService
                     })
                     .collect( Collectors.toMap( RestService::getExtension, Function.identity()) );
         if( repoPathFile.isDirectory() )
-        {   // todo return all {docsFolders}/{folder}[/index.html]
-            FolderEntry[] ret = Files.list(repoPath).map( i -> i.toFile().getName() )
-                                .map( RestService::getExtension ) // extension
-                                .distinct()
-                    .map( ext->
-                    {   File d = docRoots.get( ext );
-                        if( null != d )
-                        {   Path pp = d.toPath().resolve( folder );
-                            return pp;
-                        }
-                        // todo run doc script
-                        return null;
-                    })
-                    .filter( x -> x != null )
-                    .map( FolderEntry::new ).toArray( FolderEntry[]::new );
-
-            return ret;
+        {   // all {docsFolders}.*/{folder}[/index.html]
+            return Files.list( TempPath ).filter( n -> n.toFile().getName().startsWith( repoName+".") )
+                .map( docRootPath ->
+                {   Path dp = docRootPath.resolve( folder );
+                    for( String indexName : INDEX_FILES )
+                    {   File f = dp.resolve( indexName ).toFile();
+                        if( f.exists() )
+                            return new FolderEntry( f.toPath() );
+                    }
+                    return new FolderEntry( dp );
+                })
+                .toArray( FolderEntry[]::new );
         }
-        // todo all {docsFolders}/{folder}/{noExt}.*
+        // all {docsFolders}.*/{folder}/{noExt}.html
         return Files.list( TempPath ).filter( n -> n.toFile().getName().startsWith( repoName+".") )
                 .map( docRootPath ->
-                {   // get html for repoPathFile.getName()
-                    String docPath = folder.substring(  0, folder.length()-getExtension( repoPathFile ).length() )+"html" ;
+                {   String docPath = folder.substring(  0, folder.length()-getExtension( repoPathFile ).length() )+"html"; // todo .* instead of HTML
                     Path dp = docRootPath.resolve( docPath );
                     return new FolderEntry( dp );
                 })
                 .toArray( FolderEntry[]::new );
     }
-
         private static String
     getExtension( File f ){    return getExtension( f.getName() );    }
 
