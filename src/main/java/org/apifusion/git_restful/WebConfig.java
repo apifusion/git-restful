@@ -20,7 +20,7 @@ public class WebConfig extends WebMvcConfigurerAdapter {
             parameterName("$format")
 //            .ignoreAcceptHeader(true).
 //            useJaf(false).
-            .defaultContentType(MediaType.APPLICATION_XML)
+//            .defaultContentType(MediaType.APPLICATION_XML)
             .mediaType("xml", MediaType.APPLICATION_XML)
             .mediaType("json", MediaType.APPLICATION_JSON)
     ;

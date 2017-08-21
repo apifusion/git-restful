@@ -128,25 +128,25 @@ RestService
         return Files.list( pp ).map( FolderEntry::new ).toArray( FolderEntry[]::new );
     }
 
-        @CrossOrigin
-        @RequestMapping("/list")
-            public
-        FolderEntry[]
-    list( @RequestParam(value="repo"  ,required = false,defaultValue = "") String repo
-        , @RequestParam(value="folder",required = false,defaultValue = "") String folder ) throws IOException, InterruptedException
-    {
-        if( 0==repo.length() )
-            return Files.list( TempPath ).map( FolderEntry::new ).toArray( FolderEntry[]::new );
+//        @CrossOrigin
+//        @RequestMapping("/list")
+//            public
+//        FolderEntry[]
+//    list( @RequestParam(value="repo"  ,required = false,defaultValue = "") String repo
+//        , @RequestParam(value="folder",required = false,defaultValue = "") String folder ) throws IOException, InterruptedException
+//    {
+//        if( 0==repo.length() )
+//            return Files.list( TempPath ).map( FolderEntry::new ).toArray( FolderEntry[]::new );
+//
+//        Path root = TempPath.resolve( repo );
+//        Path repoPath = root.resolve( "."+File.separator+folder );
+//        if( repoPath.toFile().getCanonicalPath().startsWith( root.toFile().getCanonicalPath() ) )
+//            return Files.list( repoPath ).filter( n -> !n.toFile().getName().equals(".git") ).map( FolderEntry::new ).toArray( FolderEntry[]::new );
+//        throw new IOException( "malicious folder " + folder );
+//    }
 
-        Path root = TempPath.resolve( repo );
-        Path repoPath = root.resolve( "."+File.separator+folder );
-        if( repoPath.toFile().getCanonicalPath().startsWith( root.toFile().getCanonicalPath() ) )
-            return Files.list( repoPath ).filter( n -> !n.toFile().getName().equals(".git") ).map( FolderEntry::new ).toArray( FolderEntry[]::new );
-        throw new IOException( "malicious folder " + folder );
-    }
-
         @CrossOrigin
-        @RequestMapping( DOCS + "{repo}/**" ) // http://localhost:8080/docs?repo=ApiFusion.org-folders&folder=
+        @RequestMapping( DOCS + "{repo}/**" ) // http://localhost:8080/docs/git-restful/src/main/java/org/apifusion/git_restful/Application.java
             public
         FolderEntry[]
     docs( @PathVariable(value="repo") String repoName, HttpServletRequest request ) throws IOException, InterruptedException
@@ -187,7 +187,32 @@ RestService
                     })
                     .collect( Collectors.toMap( RestService::getExtension, Function.identity()) );
         if( repoPathFile.isDirectory() )
-        {   // all {docsFolders}.*/{folder}[/index.html]
+        {
+            ArrayList<FolderEntry> ret = new ArrayList<>();
+            String[]    files = TempPath.resolve( srcPath ).toFile().list();
+
+            //  for each tool with file type in directory
+            //      if package doc not exist
+            //          generate doc
+            //      add package doc to result
+            Path[] generated = docTools()
+            .filter( p ->
+            {   String ext = p.toFile().getName();
+                if( docRoots.containsKey( ext ) ) // already generated
+                    return false;
+                for( String n : files )
+                    if( n.endsWith( '.'+ext ) ) // has at least one file with extension
+                    {   Path docRoot = TempPath.resolve( repoName+"."+ext );
+                        docRoots.put( ext, docRoot.toFile() );
+                        Path docFolder = docRoot.resolve( srcPath );
+                        String[] out = exec( p.toString()+' '+docFolder , repoPathFile );
+
+                        return true;
+                    }
+                return false;   // no files in folder for tool
+            }).toArray( Path[]::new );
+
+            // all {docsFolders}.*/{folder}[/index.html]
             return Files.list( TempPath ).filter( n -> n.toFile().getName().startsWith( repoName+".") )
                 .map( docRootPath ->
                 {   Path dp = docRootPath.resolve( folder );
@@ -208,6 +233,12 @@ RestService
                     return new FolderEntry( dp );
                 })
                 .toArray( FolderEntry[]::new );
+    }
+        private Stream<Path>
+    docTools() throws IOException
+    {
+        // todo extract tools from resources or list from FS
+        return Files.list( TempPath.resolve( "doctools" ) );
     }
         private static String
     getExtension( File f ){    return getExtension( f.getName() );    }
@@ -231,9 +262,10 @@ RestService
     log( String s ){ System.out.println(s); }
         private void
     log( String s1, String s2 ){ System.out.print(s1); System.out.print(' '); System.out.println(s2); }
+
             private
         String[]
-    exec( String cmd, String repo ) throws IOException, InterruptedException
+    exec( String cmd, String repo ) throws IOException
     {
         System.out.println( cmd );
 
@@ -247,29 +279,44 @@ RestService
 
         Files.createDirectories( repoP );
         System.out.println(repoPath);
-
-        File       cmdFile = File.createTempFile( "cmd", ".bat", TempPath.toFile() ); cmdFile.deleteOnExit();
-        boolean      isWin = File.separatorChar == '\\';
-        String[] batchBody = { isWin ? "@echo off" : "#!/usr/bin/env bash ", cmd };
-        String      exeCmd = ( isWin ? "cmd /c "   :   "/usr/bin/env bash " ) + cmdFile.getPath();
-        System.out.println(exeCmd);
-        Files.write( cmdFile.toPath(), Arrays.asList(batchBody) , StandardCharsets.UTF_8 );
-        Process p = Runtime.getRuntime().exec( exeCmd , null, repoPath );
-
-        BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
-        BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-        String s;
+        return exec( cmd, repoPath );
+    }
+            private
+        String[]
+    exec( String cmd, File execPath )
+    {
         ArrayList<String> ret=new ArrayList<>();
-        while( (s = stdInput.readLine()) != null )
-        {   ret.add( s );
-            System.out.println( s );
-        }
-        while( (s = stdError.readLine()) != null)
-            System.err.println(s);
+        try
+        {   File       cmdFile = File.createTempFile( "cmd", ".bat", TempPath.toFile() ); cmdFile.deleteOnExit();
+            boolean      isWin = File.separatorChar == '\\';
+            String[] batchBody = { isWin ? "@echo off" : "#!/usr/bin/env bash ", cmd };
+            String      exeCmd = ( isWin ? "cmd /c "   :   "/usr/bin/env bash " ) + cmdFile.getPath();
+            System.out.println(exeCmd);
+            Files.write( cmdFile.toPath(), Arrays.asList(batchBody) , StandardCharsets.UTF_8 );
+            Process p = Runtime.getRuntime().exec( exeCmd , null, execPath );
 
-        p.waitFor();
-        System.out.println( cmdFile + " done" );
-        cmdFile.delete();
+            BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
+            BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+            String s;
+            while( (s = stdInput.readLine()) != null )
+            {   ret.add( s );
+                System.out.println( s );
+            }
+            while( (s = stdError.readLine()) != null)
+                System.err.println(s);
+
+            p.waitFor();
+            System.out.println( cmd + " | DONE "+cmdFile  );
+            cmdFile.delete();
+        }catch( IOException ioe )
+            {
+                ioe.printStackTrace();
+            }
+        catch( InterruptedException ie )
+            {
+                System.err.println(ie.getMessage());
+            }
+
         return ret.toArray( STRING_ARRAY );
     }
 }
