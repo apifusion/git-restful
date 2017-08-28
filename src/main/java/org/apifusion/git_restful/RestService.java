@@ -125,6 +125,8 @@ RestService
             request.getRequestDispatcher(  PAGES + p  ).forward( request, response );
             return null;
         }
+        if( ".git".equals( f.getName()) )
+            return new FolderEntry[]{};
         return Files.list( pp ).map( FolderEntry::new ).toArray( FolderEntry[]::new );
     }
 
