@@ -120,6 +120,9 @@ RestService
         String p = folder.substring( PROJECTS.length() );
         Path pp = TempPath.resolve( p );
         File f = pp.toFile();
+        if( !p.endsWith( "/" ) )
+            return new FolderEntry[]{ new FolderEntry( pp ) };
+
         if( f.isFile() )
         {
             request.getRequestDispatcher(  PAGES + p  ).forward( request, response );
