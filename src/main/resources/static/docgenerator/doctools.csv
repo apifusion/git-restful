@@ -1,0 +1,5 @@
+#DocDirExt, SrcExt, DocScript
+javadoc,    mvn,    mvn
+javadoc,    java,   java
+jsdoc,      jsdoc,  jsdoc
+pydoc,      py,     sphinx
