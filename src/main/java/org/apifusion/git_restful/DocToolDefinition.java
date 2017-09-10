@@ -1,10 +1,7 @@
 package org.apifusion.git_restful;
 
-import org.springframework.core.io.ClassPathResource;
-
-import java.io.IOException;
+import java.io.File;
 import java.net.URL;
-import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -26,14 +23,17 @@ DocToolDefinition
     public String DocScript;    // relative to webapp/docgenerator folder path to doc generator script
                                 // i.e. "java" refers to webapp/docgenerator/java.sh or webapp/docgenerator/java.bat
 
-    public static DocToolDefinition[] ReadDocTools()
-    {
+        public static DocToolDefinition[]
+    ReadDocTools()
+    {   // reading in runtime to allow the scripts tune up by changing CSV in classpath "static/docgenerator/doctools.csv"
+
         URL u = Thread.currentThread().getContextClassLoader().getResource( Application.DOCTOOLS_CSV );
         List<DocToolDefinition> ret= new ArrayList<DocToolDefinition>(4);
         try
         {   List<String> lines = Files.readAllLines( Paths.get( u.toURI()  ));
             for( String s : lines )
-            {
+            {   if( s.startsWith( "#" ) )
+                    continue;
                 String[] a= s.split( "," );
                 DocToolDefinition d = new DocToolDefinition();
                 d.DocDirExt = a[0].trim();
@@ -53,5 +53,13 @@ DocToolDefinition
             if( n.endsWith( '.' + SrcExt ) )
                 return true;
         return false;
+    }
+        public String
+    getScriptPath()
+    {
+            String script = Application.DoctoolsPath
+                    .resolve(  this.DocScript+( File.separator.equals( "\\" )? ".bat":".sh") )
+                    .toString();
+            return script;
     }
 }

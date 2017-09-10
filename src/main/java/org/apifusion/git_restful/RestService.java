@@ -7,10 +7,7 @@ import org.springframework.web.servlet.HandlerMapping;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -157,10 +154,7 @@ RestService
     docs( @PathVariable(value="repo") String repoName, HttpServletRequest request ) throws IOException, InterruptedException
     {
         /*
-        *   1. Check whether docs exist
-        *   1a. if exist check whether docs created after pulling the branch
-        *       2a. if yes, include in return list
-        *       2b. otherwise remove docs
+        *   1. check for outdated docs in ${repo}.javadoc folder, remove older than sources
         *   3. if docs not in result list
         *   4a. generate docs
         *   4b. add generated into result list
@@ -170,16 +164,23 @@ RestService
         String srcPath = urlPath.substring( DOCS.length() );
         String folder  = srcPath.substring( repoName.length()+1 );
 
-        Path root = TempPath.resolve( repoName );
-        long repoTime = root.toFile().lastModified();
+        Path repoRoot = TempPath.resolve( repoName );
+        long repoTime = repoRoot.toFile().lastModified();
         Path repoPath = TempPath.resolve( srcPath );
         File repoPathFile = repoPath.toFile();
         String folderName = repoPathFile.getName();
 
         log( repoPathFile.getAbsolutePath() );
-        if( !repoPathFile.getCanonicalPath().startsWith( root.toFile().getCanonicalPath() ) )
+        if( !repoPathFile.getCanonicalPath().startsWith( repoRoot.toFile().getCanonicalPath() ) )
             throw new IOException( "malicious folder " + srcPath );
-        Map<String, File> docRoots = Files.list( TempPath )
+
+        // 1. check for outdated docs in ${repo}.javadoc folder, remove older than sources
+//todo move docroots into directory section & use directory instead of root
+        final DocToolDefinition[] docTools =  DocToolDefinition.ReadDocTools();
+
+        if( repoPathFile.isDirectory() )
+        {
+            Map<String, File> docPaths = Files.list( TempPath )
                     .map( Path::toFile )
                     .filter( f ->
                     {   if( !f.getName().startsWith( repoName+".") )
@@ -187,58 +188,101 @@ RestService
                         if( f.lastModified() >= repoTime )
                             return true;
 
-                        deleteFolder( f.toPath(), "outdated" ); // 2b
+                        deleteFolder( f.toPath(), "outdated" ); // delete outdated docs root folder
                         return false;
-                    })
-                    .collect( Collectors.toMap( RestService::getExtension, Function.identity()) );
-        if( repoPathFile.isDirectory() )
-        {
-            ArrayList<FolderEntry> ret = new ArrayList<>();
-            String[]    files = TempPath.resolve( srcPath ).toFile().list();
+                    }).map( f->f.toPath().resolve( folder ).toFile() )
+                    .filter( f ->
+                    {   if( !f.exists() )
+                            return false;
+                        if( f.lastModified() >= repoTime )
+                            return true;
+
+                        deleteFolder( f.toPath(), "outdated" ); // delete outdated docs+path folder
+                        return false;
+                    }).collect( Collectors.toMap( RestService::getDocExt, Function.identity()) );
+// todo validate getDocExt
+
+//            ArrayList<FolderEntry> ret = new ArrayList<>();
+            String[]    srcFiles = TempPath.resolve( srcPath ).toFile().list();
 
             //  for each tool with file type in directory
             //      if package doc not exist
             //          generate doc
             //      add package doc to result
-            Path[] generated = docTools()
-            .filter( p ->
-            {   String ext = p.toFile().getName();
-                if( docRoots.containsKey( ext ) ) // already generated
-                    return false;
-                for( String n : files )
-                    if( n.endsWith( '.'+ext ) ) // has at least one file with extension
-                    {   Path docRoot = TempPath.resolve( repoName+"."+ext );
-                        docRoots.put( ext, docRoot.toFile() );
-                        Path docFolder = docRoot.resolve( srcPath );
-                        String[] out = exec( p.toString()+' '+docFolder , repoPathFile );
+            String[] out;
 
-                        return true;
-                    }
-                return false;   // no files in folder for tool
-            }).toArray( Path[]::new );
+            for( DocToolDefinition docTool: docTools )
+            {
+                String docExt = docTool.DocDirExt;
+                if( docPaths.containsKey( docExt ) ) // already generated
+                    continue;
+                if( docTool.isServing(srcFiles) )
+                {   Path docRoot = TempPath.resolve( repoName+"."+docExt );
+                    Path    docFolder = docRoot.resolve( folder );
+                    docPaths.put( docExt, docFolder.toFile() );
+                    String     script = docTool.getScriptPath();
+                    out = exec( script+' '+docFolder , repoPathFile );
+                }
+            }
 
             // all {docsFolders}.*/{folder}[/index.html]
-            return Files.list( TempPath ).filter( n -> n.toFile().getName().startsWith( repoName+".") )
-                .map( docRootPath ->
+            FolderEntry[] ret =  docPathStream( repoName ).map( docRootPath ->
                 {   Path dp = docRootPath.resolve( folder );
+                    String docExt = getDocExt( dp.toFile() );
                     for( String indexName : INDEX_FILES )
                     {   File f = dp.resolve( indexName ).toFile();
+                        if( f.exists() )
+                            return new FolderEntry( f.toPath() );
+                        f = dp.resolve( docExt ).resolve( indexName ).toFile();
                         if( f.exists() )
                             return new FolderEntry( f.toPath() );
                     }
                     return new FolderEntry( dp );
                 })
                 .toArray( FolderEntry[]::new );
+            return ret;
         }
         // all {docsFolders}.*/{folder}/{noExt}.html
-        return Files.list( TempPath ).filter( n -> n.toFile().getName().startsWith( repoName+".") )
-                .map( docRootPath ->
+        return docPathStream( repoName ).map( docRootPath ->
                 {   String docPath = folder.substring(  0, folder.length()-getExtension( repoPathFile ).length() )+"html"; // todo .* instead of HTML
                     Path dp = docRootPath.resolve( docPath );
-                    return new FolderEntry( dp );
-                })
+                    if( Files.exists( dp ) )
+                        return new FolderEntry( dp );
+                    Path docFolder = dp.getParent();
+                    String docFileName = dp.toFile().getName();
+
+                    for( DocToolDefinition docTool: docTools )
+                    {   Path p = findInPath( docFolder.resolve( docTool.DocDirExt), docFileName );
+                        if( null != p )
+                            return new FolderEntry( p );
+                    }
+                    return null;
+
+//                    Path ret = Arrays.stream( docTools )
+//                            .map( docTool -> findInPath( docFolder.resolve( docTool.DocDirExt), docFileName ) )
+//                            .filter( Objects::nonNull )
+//                            .findFirst()
+//                            .get();
+//
+//                    return ret;
+                }).filter( e-> null != e )
                 .toArray( FolderEntry[]::new );
     }
+        Path
+    findInPath( Path searchFrom, String fileName )
+    {   try
+        {   if( Files.exists( searchFrom ) )
+                return Files.walk( searchFrom )
+                            .filter( p-> fileName.equals( p.toFile().getName() ) )
+                            .findFirst().get();
+        }catch( IOException e )
+            {   e.printStackTrace(); }
+        return null;
+    }
+        Stream<Path>
+    docPathStream( String repoName ) throws IOException
+        { return Files.list( TempPath ).filter( n -> n.toFile().getName().startsWith( repoName+".") ); }
+
         private Stream<Path>
     docTools() throws IOException
     {
@@ -247,6 +291,13 @@ RestService
     }
         private static String
     getExtension( File f ){    return getExtension( f.getName() );    }
+        private static String
+    getDocExt( File f )
+    {   String r = TempPath.relativize( f.toPath() ).getName( 0 ).toString();
+        int i = r.indexOf( '.' )+1;
+        String ret = r.substring( i );
+        return ret;
+    }
 
         private static String
     getExtension( String n ){    return n.substring(n.lastIndexOf('.')+1);    }
@@ -286,6 +337,48 @@ RestService
         System.out.println(repoPath);
         return exec( cmd, repoPath );
     }
+        class
+    StreamGobbler extends Thread
+    {
+        InputStream is;
+        String type;
+        OutputStream os;
+
+        StreamGobbler(InputStream is, String type)
+        {
+            this(is, type, null);
+        }
+        StreamGobbler(InputStream is, String type, OutputStream redirect)
+        {
+            this.is = is;
+            this.type = type;
+            this.os = redirect;
+        }
+
+        public void run()
+        {
+            try
+            {   PrintWriter pw = null;
+                if (os != null)
+                    pw = new PrintWriter( os);
+
+                InputStreamReader isr = new InputStreamReader(is);
+                BufferedReader br = new BufferedReader(isr);
+                String line=null;
+                while ( (line = br.readLine()) != null)
+                {
+                    if (pw != null)
+                        pw.println(line);
+                    System.out.println(type + ">" + line);
+                }
+                if (pw != null)
+                    pw.flush();
+            } catch (IOException ioe)
+                {
+                ioe.printStackTrace();
+                }
+        }
+    }
             private
         String[]
     exec( String cmd, File execPath )
@@ -299,19 +392,14 @@ RestService
             System.out.println(exeCmd);
             Files.write( cmdFile.toPath(), Arrays.asList(batchBody) , StandardCharsets.UTF_8 );
             Process p = Runtime.getRuntime().exec( exeCmd , null, execPath );
+            StreamGobbler err = new StreamGobbler( p.getErrorStream(), "ERROR" );
+            StreamGobbler out = new StreamGobbler( p.getInputStream(), "OUTPUT");
 
-            BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
-            BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-            String s;
-            while( (s = stdInput.readLine()) != null )
-            {   ret.add( s );
-                System.out.println( s );
-            }
-            while( (s = stdError.readLine()) != null)
-                System.err.println(s);
+            err.start();
+            out.start();
 
-            p.waitFor();
-            System.out.println( cmd + " | DONE "+cmdFile  );
+            int exitCode = p.waitFor();
+            System.out.println( cmd + " | DONE "+cmdFile+" | exit code "+ exitCode  );
             cmdFile.delete();
         }catch( IOException ioe )
             {
