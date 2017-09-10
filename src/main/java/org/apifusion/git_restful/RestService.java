@@ -200,9 +200,7 @@ RestService
                         deleteFolder( f.toPath(), "outdated" ); // delete outdated docs+path folder
                         return false;
                     }).collect( Collectors.toMap( RestService::getDocExt, Function.identity()) );
-// todo validate getDocExt
 
-//            ArrayList<FolderEntry> ret = new ArrayList<>();
             String[]    srcFiles = TempPath.resolve( srcPath ).toFile().list();
 
             //  for each tool with file type in directory

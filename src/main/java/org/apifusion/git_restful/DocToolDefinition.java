@@ -16,12 +16,12 @@ import java.util.List;
     public class
 DocToolDefinition
 {
-    public String DocDirExt;    // the suffix appended to project name for docs folder
-                                // like "javadoc" for "git-restful.javadoc"
-    public String SrcExt;       // if the source file with given extension presented in folder the DocScript would run
-                                // i.e. for "mvn' if source directory has *.mvn file run the docgenerator/mvn.sh (or bat)
-    public String DocScript;    // relative to webapp/docgenerator folder path to doc generator script
-                                // i.e. "java" refers to webapp/docgenerator/java.sh or webapp/docgenerator/java.bat
+    public String DocDirExt;// the suffix appended to project name for docs folder
+                            // like "javadoc" for "git-restful.javadoc"
+    public String SrcExt;   // if the source file with given ending(extension or name) presented in folder the DocScript would run
+                            // for "mvn' if source directory has pom.xml file, run the docgenerator/mvn.(sh|bat)
+    public String DocScript;// relative to webapp/docgenerator folder path to doc generator script
+                            // i.e. "java" refers to webapp/docgenerator/java.sh or webapp/docgenerator/java.bat
 
         public static DocToolDefinition[]
     ReadDocTools()
@@ -50,16 +50,16 @@ DocToolDefinition
     public boolean isServing( String[] files )
     {
         for( String n : files )
-            if( n.endsWith( '.' + SrcExt ) )
+            if( n.endsWith( SrcExt ) )
                 return true;
         return false;
     }
         public String
     getScriptPath()
     {
-            String script = Application.DoctoolsPath
-                    .resolve(  this.DocScript+( File.separator.equals( "\\" )? ".bat":".sh") )
-                    .toString();
-            return script;
+        String script = Application.DoctoolsPath
+                .resolve(  this.DocScript+( File.separator.equals( "\\" )? ".bat":".sh") )
+                .toString();
+        return script;
     }
 }
