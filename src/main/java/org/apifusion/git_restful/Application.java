@@ -7,11 +7,20 @@ import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.net.URLDecoder;
+import java.nio.file.*;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 
 @SpringBootApplication
     public class
@@ -33,8 +42,10 @@ Application
 	{
 	    // copy resources into tempPath
         try
-        {   URL u = Thread.currentThread().getContextClassLoader().getResource( DOC_RESOURCES );
-            copyFolder( Paths.get( u.toURI()  ), DoctoolsPath );
+        {   ClassLoader cl = Thread.currentThread().getContextClassLoader();
+            URI uri = cl.getResource( DOC_RESOURCES ).toURI();
+            if( !copyFromJar( cl, DOC_RESOURCES, DoctoolsPath ) )
+                copyFolder( Paths.get( uri ), DoctoolsPath );
         }catch( Exception e )
             {   e.printStackTrace(); }
 
@@ -51,25 +62,72 @@ Application
             }
         };
     }
+
+    boolean copyFromJar( ClassLoader clazz, String path, Path dest ) throws URISyntaxException, IOException
+    {
+        URL dirURL = clazz.getResource( path );
+        if( dirURL != null && dirURL.getProtocol().equals( "file" ) )
+            return false;
+
+        if( dirURL == null )  // In case of a jar file, we can't actually find a directory.* Have to assume the same jar as clazz.
+            dirURL = clazz.getResource( path );
+
+        if( dest.toFile().mkdirs() )
+            System.out.println( "created " + dest );
+        else
+            System.out.println( "failed to create " + dest );
+
+
+        if( !dirURL.getProtocol().equals( "jar" ) )
+            return false;
+
+        String jarPath = dirURL.getPath().substring( 5, dirURL.getPath()
+                .indexOf( "!" ) ); //strip out only the JAR file
+        System.out.println( "extracting|" + jarPath );
+
+        JarFile jar = new JarFile( URLDecoder.decode( jarPath, "UTF-8" ) );
+        Enumeration< JarEntry > entries = jar.entries(); //gives ALL entries in jar
+        while( entries.hasMoreElements() )
+        {
+            JarEntry je = entries.nextElement();
+            String name = je.getName()
+            ,     entry = name.substring( name.lastIndexOf( '/' )+1 );
+            if( !name.contains( path ) || entry.isEmpty() )
+                continue;
+
+            Path d = dest.resolve( entry );
+            try
+            {   Files.copy( jar.getInputStream( je ), d );
+                System.out.println( "extracted |" + d + "| from |"+name );
+            }catch( java.nio.file.FileAlreadyExistsException ex )
+                {   System.out.println( "skipping existing |" + d ); }
+            catch( Exception ex )
+                {   System.out.println( "creation ERROR of |" + d + "| "+ex.getMessage()); }
+
+        }
+        return true;
+    }
         public  static void
     copyFolder( Path src, Path dest )
     {
         try
         {   Files.walk( src )
             .forEach( s ->
-            {   try
-                {   Path d = dest.resolve( src.relativize(s) );
-                    if( Files.isDirectory( s ) )
+            {   Path d = dest.resolve( src.relativize(s) );
+                try
+                {   if( Files.isDirectory( s ) )
                     {   if( !Files.exists( d ) )
                             Files.createDirectory( d );
                         return;
                     }
                     if( Files.exists( d ) )
-                        System.out.println( "using existing " + d );
+                        System.out.println( "skipping existing |" + d );
                     else
-                        Files.copy( s, d );
-                }catch( Exception e )
-                    { e.printStackTrace(); }
+                    {   Files.copy( s, d );
+                        System.out.println( "copied |" + d + "| from |"+s );
+                    }
+                }catch( Exception ex )
+                    { System.out.println( "creation ERROR of |" + d + "| "+ex.getMessage());  }
             });
         }catch( Exception ex )
             {   ex.printStackTrace(); }

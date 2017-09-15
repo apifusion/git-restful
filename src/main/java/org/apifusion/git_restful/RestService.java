@@ -341,6 +341,7 @@ RestService
         InputStream is;
         String type;
         OutputStream os;
+        public ArrayList<String> ret = new ArrayList<>();
 
         StreamGobbler(InputStream is, String type)
         {
@@ -363,18 +364,16 @@ RestService
                 InputStreamReader isr = new InputStreamReader(is);
                 BufferedReader br = new BufferedReader(isr);
                 String line=null;
-                while ( (line = br.readLine()) != null)
-                {
+                while( (line = br.readLine()) != null )
+                {   ret.add( line );
                     if (pw != null)
                         pw.println(line);
                     System.out.println(type + ">" + line);
                 }
-                if (pw != null)
+                if( pw != null )
                     pw.flush();
-            } catch (IOException ioe)
-                {
-                ioe.printStackTrace();
-                }
+            } catch( IOException ioe )
+                {   ioe.printStackTrace();  }
         }
     }
             private
@@ -397,6 +396,9 @@ RestService
             out.start();
 
             int exitCode = p.waitFor();
+            err.join();
+            out.join();
+            ret = out.ret;
             System.out.println( cmd + " | DONE "+cmdFile+" | exit code "+ exitCode  );
             cmdFile.delete();
         }catch( IOException ioe )
