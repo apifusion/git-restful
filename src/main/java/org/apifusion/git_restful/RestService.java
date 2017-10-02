@@ -125,9 +125,9 @@ RestService
             request.getRequestDispatcher(  PAGES + p  ).forward( request, response );
             return null;
         }
-        if( ".git".equals( f.getName()) )
-            return new FolderEntry[]{};
-        return Files.list( pp ).map( FolderEntry::new ).toArray( FolderEntry[]::new );
+        String[] files = exec( "git ls-tree --name-only HEAD" , pp.toFile() );
+
+        return Stream.of(files).map( n-> pp.resolve( n ) ).map( FolderEntry::new ).toArray( FolderEntry[]::new );
     }
 
 //        @CrossOrigin
@@ -162,7 +162,9 @@ RestService
 
         String urlPath =(String) request.getAttribute( HandlerMapping.PATH_WITHIN_HANDLER_MAPPING_ATTRIBUTE );
         String srcPath = urlPath.substring( DOCS.length() );
-        String folder  = srcPath.substring( repoName.length()+1 );
+        String folder   = repoName.length() >= srcPath.length()
+                        ? ""
+                        : srcPath.substring( repoName.length()+1 );
 
         Path repoRoot = TempPath.resolve( repoName );
         long repoTime = repoRoot.toFile().lastModified();
