@@ -16,6 +16,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static java.nio.file.Files.*;
+
 /**
  * Restful API controller
  */
@@ -182,7 +184,7 @@ RestService
 
         if( repoPathFile.isDirectory() )
         {
-            Map<String, File> docPaths = Files.list( TempPath )
+            Map<String, File> docPaths = list( TempPath )
                     .map( Path::toFile )
                     .filter( f ->
                     {   if( !f.getName().startsWith( repoName+".") )
@@ -226,7 +228,7 @@ RestService
             }
 
             // all {docsFolders}.*/{folder}[/index.html]
-            FolderEntry[] ret =  docPathStream( repoName ).map( docRootPath ->
+            FolderEntry[] ret =  docPathStream( repoName ).map( ( Path docRootPath ) ->
                 {   Path dp = docRootPath.resolve( folder );
                     String docExt = getDocExt( dp.toFile() );
                     for( String indexName : INDEX_FILES )
@@ -237,6 +239,13 @@ RestService
                         if( f.exists() )
                             return new FolderEntry( f.toPath() );
                     }
+                    try
+                    {   String s = "<html><body>"+Files.list(  docRootPath )
+                            .map( p-> "<a href='"+p.toFile().getName()+"'>"+p.toFile().getName()+"</a>" )
+                            .collect( Collectors.joining( "<br/>\n") )+"</body></html>";
+                        Files.write( docRootPath.resolve( INDEX_FILES[0] ), s.getBytes( StandardCharsets.UTF_8 ));
+                    }catch( IOException e )
+                        { e.printStackTrace(); }
                     return new FolderEntry( dp );
                 })
                 .toArray( FolderEntry[]::new );
@@ -246,7 +255,7 @@ RestService
         return docPathStream( repoName ).map( docRootPath ->
                 {   String docPath = folder.substring(  0, folder.length()-getExtension( repoPathFile ).length() )+"html"; // todo .* instead of HTML
                     Path dp = docRootPath.resolve( docPath );
-                    if( Files.exists( dp ) )
+                    if( exists( dp ) )
                         return new FolderEntry( dp );
                     Path docFolder = dp.getParent();
                     String docFileName = dp.toFile().getName();
@@ -271,8 +280,8 @@ RestService
         Path
     findInPath( Path searchFrom, String fileName )
     {   try
-        {   if( Files.exists( searchFrom ) )
-                return Files.walk( searchFrom )
+        {   if( exists( searchFrom ) )
+                return walk( searchFrom )
                             .filter( p-> fileName.equals( p.toFile().getName() ) )
                             .findFirst().get();
         }catch( IOException e )
@@ -281,13 +290,13 @@ RestService
     }
         Stream<Path>
     docPathStream( String repoName ) throws IOException
-        { return Files.list( TempPath ).filter( n -> n.toFile().getName().startsWith( repoName+".") ); }
+        { return list( TempPath ).filter( n -> n.toFile().getName().startsWith( repoName+".") ); }
 
         private Stream<Path>
     docTools() throws IOException
     {
         // todo extract tools from resources or list from FS
-        return Files.list( TempPath.resolve( "doctools" ) );
+        return list( TempPath.resolve( "doctools" ) );
     }
         private static String
     getExtension( File f ){    return getExtension( f.getName() );    }
@@ -306,7 +315,7 @@ RestService
     deleteFolder( Path rootPath, String reason )
     {   log( "removing "+reason, rootPath.toString() );
         try
-        {   Files.walk(rootPath)
+        {   walk(rootPath)
                 .sorted(Comparator.reverseOrder())
                 .map(Path::toFile)
 //                .peek(System.out::println)
@@ -333,7 +342,7 @@ RestService
             throw new IOException( "malicious repo name " + repo );
         }
 
-        Files.createDirectories( repoP );
+        createDirectories( repoP );
         System.out.println(repoPath);
         return exec( cmd, repoPath );
     }
@@ -389,7 +398,7 @@ RestService
             String[] batchBody = { isWin ? "@echo off" : "#!/usr/bin/env bash ", cmd };
             String      exeCmd = ( isWin ? "cmd /c "   :   "/usr/bin/env bash " ) + cmdFile.getPath();
             System.out.println(exeCmd);
-            Files.write( cmdFile.toPath(), Arrays.asList(batchBody) , StandardCharsets.UTF_8 );
+            write( cmdFile.toPath(), Arrays.asList(batchBody) , StandardCharsets.UTF_8 );
             Process p = Runtime.getRuntime().exec( exeCmd , null, execPath );
             StreamGobbler err = new StreamGobbler( p.getErrorStream(), "ERROR" );
             StreamGobbler out = new StreamGobbler( p.getInputStream(), "OUTPUT");
