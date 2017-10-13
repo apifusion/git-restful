@@ -58,6 +58,7 @@ RestService
         String
     lockRepo( @RequestParam(value="url") String url ) throws IOException, InterruptedException
     {
+        createDirectories( TempPath );
         String repo = url.substring( url.lastIndexOf('/')+1, url.lastIndexOf('.') );
         File repoPath = TempPath.resolve( repo ).toFile();
         if( repoPath.exists() )
@@ -335,7 +336,7 @@ RestService
         System.out.println( cmd );
 
         Path repoP = TempPath.resolve( repo );
-        File repoPath = repoP.toFile();
+        File repoPath = repoP.toFile().getCanonicalFile();
         if( !repoPath.exists() )
         {
             System.err.println( repo );
