@@ -1,4 +1,5 @@
 #DocDirExt, SrcExt, DocScript
+srcls,     ,        srcls
 javadoc,    pom.xml, mvn
 javadoc,    .java,   java
 jsdoc,      .jsdoc,  jsdoc
